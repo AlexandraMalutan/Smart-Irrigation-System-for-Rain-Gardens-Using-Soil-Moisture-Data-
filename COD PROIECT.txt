@@ -1,0 +1,298 @@
+import numpy as np 
+import pywt
+from scipy.ndimage import median_filter 
+from scipy import signal
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+
+#ANALIZA DATELOR, LABORATOR 2
+
+data = pd.read_csv(r'C:\Users\alema\Desktop\AN3\SBC\PROIECT\RainGarden.csv') 
+print(data.head()) 
+
+#analiza descriptiva
+print(data.head()) 
+data.shape
+data.info() 
+data.describe()
+data.columns.tolist()
+data.isnull().sum() 
+data.nunique() 
+
+#analiza vizuala
+data = pd.read_csv(r'C:\Users\alema\Desktop\AN3\SBC\PROIECT\RainGarden.csv') 
+moisture_sensor1 = data['wfv_1'].value_counts() 
+plt.figure(figsize=(8, 6)) 
+plt.bar(moisture_sensor1.index, moisture_sensor1, color='lightpink') 
+plt.title('Count Plot of Moisture Sensor 1') 
+plt.xlabel('Sensor 1') 
+plt.ylabel('Frequency') 
+plt.show() 
+
+moisture_sensor2 = data['wfv_2'].value_counts() 
+plt.figure(figsize=(8, 6)) 
+plt.bar(moisture_sensor2.index, moisture_sensor2, color='lightpink') 
+plt.title('Count Plot of Moisture Sensor 2') 
+plt.xlabel('Sensor 2') 
+plt.ylabel('Frequency') 
+plt.show() 
+
+moisture_sensor3 = data['wfv_3'].value_counts() 
+plt.figure(figsize=(8, 6)) 
+plt.bar(moisture_sensor3.index, moisture_sensor3, color='lightpink') 
+plt.title('Count Plot of Moisture Sensor 3') 
+plt.xlabel('Sensor 3') 
+plt.ylabel('Frequency') 
+plt.show() 
+
+
+#kdp
+sns.set_style("darkgrid") 
+numerical_columns = data.select_dtypes(include=["int64", "float64"]).columns 
+plt.figure(figsize=(14, len(numerical_columns) * 3)) 
+for idx, feature in enumerate(numerical_columns, 1): 
+ plt.subplot(len(numerical_columns), 2, idx) 
+ sns.histplot(data[feature], kde=True) 
+ plt.title(f"{feature} | Skewness: {round(data[feature].skew(), 2)}")  
+plt.tight_layout() 
+plt.show() 
+
+
+#analiza bivariata
+sns.set_palette("Pastel1") 
+plt.figure(figsize=(10, 6))  
+sns.pairplot(data) 
+plt.suptitle('Pair Plot for DataFrame') 
+plt.show() 
+
+#analiza multivariata
+sensor_columns = ['wfv_1', 'wfv_2', 'wfv_3']
+data_sensors = data[sensor_columns]
+correlation_matrix = data_sensors.corr()
+plt.figure(figsize=(6, 5))
+sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=2)
+plt.title("Heatmap de Corelație între Senzorii de Umiditate")
+plt.show()
+
+
+#analiza temporala
+data['Time'] = pd.to_datetime(data['Time'], errors='coerce')
+data.set_index('Time', inplace=True)
+plt.figure(figsize=(12, 6))
+plt.plot(data.index, data['wfv_1'], label='wfv_1', alpha=0.7)
+plt.plot(data.index, data['wfv_2'], label='wfv_2', alpha=0.7)
+plt.plot(data.index, data['wfv_3'], label='wfv_3', alpha=0.7)
+
+plt.xlabel("Timp")
+plt.ylabel("Umiditate (%)")
+plt.title("Evoluția Umidității Solului în Timp")
+plt.legend()
+plt.xticks(rotation=45)
+plt.show()
+
+
+#calculez umiditatea pe luna pt fiecare senzor
+data['Month'] = data.index.month  # Extragem luna din coloana de timp
+monthly_avg = data.groupby('Month')[['wfv_1', 'wfv_2', 'wfv_3']].mean()
+
+# Crearea graficului de sezonalitate
+plt.figure(figsize=(10, 6))
+plt.plot(monthly_avg.index, monthly_avg['wfv_1'], marker='o', label='wfv_1', alpha=0.7)
+plt.plot(monthly_avg.index, monthly_avg['wfv_2'], marker='o', label='wfv_2', alpha=0.7)
+plt.plot(monthly_avg.index, monthly_avg['wfv_3'], marker='o', label='wfv_3', alpha=0.7)
+plt.xlabel("Lună")
+plt.ylabel("Umiditate Medie (%)")
+plt.title("Sezonalitatea Umidității Solului")
+plt.xticks(ticks=range(1, 13), labels=[
+    "Ian", "Feb", "Mar", "Apr", "Mai", "Iun", "Iul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+#PREPROCESARE DATE LABORATOR 4
+
+
+#denoising, filtru median 
+eeg_signal = data['wfv_2'].values[:1000]   
+time = np.arange(len(eeg_signal))  
+plt.figure(figsize=(10, 6)) 
+plt.plot(time, eeg_signal, label='Original EEG Signal') 
+plt.title("Original EEG Signal") 
+plt.legend() 
+plt.show() 
+
+#Median filter 
+def apply_median_filter(data, size=5): 
+    filtered_data = median_filter(data, size=size) 
+    # Plotting 
+    plt.figure(figsize=(10, 6)) 
+    plt.plot(time, eeg_signal, label='Original EEG Signal', color='blue', alpha=0.5) 
+    plt.plot(time, filtered_data, label='Median Filtered', color='orange') 
+    plt.title('Original vs. Median Filtered Signal') 
+    plt.legend() 
+    plt.show() 
+    return filtered_data 
+# Apply filters and plot results 
+sampling_rate = 256  # Hz, assuming EEG is sampled at 256 Hz
+cutoff = 40  # Hz, as EEG signals of interest are typically below this frequency 
+# Apply each filter and visualize immediately 
+median_filtered = apply_median_filter(eeg_signal) 
+
+
+
+#dimensionality reduction
+#nu este nevoie
+
+
+
+#interpolare, Forward and backward filling
+median_filtered_series = pd.Series(median_filtered)
+eeg_ffill = median_filtered_series.ffill()  # Forward Fill
+eeg_bfill = median_filtered_series.bfill()  # Backward Fill
+eeg_ffill_bfill = median_filtered_series.ffill().bfill()
+plt.figure(figsize=(10, 6))
+plt.plot(time, median_filtered_series, label="Original cu NaN", color='gray', alpha=0.5)
+plt.plot(time, eeg_ffill, label="Forward Filled", color='red', linestyle='--')
+plt.plot(time, eeg_bfill, label="Backward Filled", color='blue', linestyle='--')
+plt.plot(time, eeg_ffill_bfill, label="FFill + BFill", color='green')
+plt.title("Forward and Backward Filling Interpolation")
+plt.legend()
+plt.show()
+
+
+
+
+
+#detrending, substraction of moving average
+window_size = 100  
+moving_avg = eeg_ffill_bfill.rolling(window=window_size, center=True).mean()
+moving_avg = moving_avg.bfill().ffill()
+detrended_moving_avg = eeg_ffill_bfill - moving_avg
+plt.figure(figsize=(10, 6))
+plt.plot(time, eeg_ffill_bfill, label="Original (Interpolated)", alpha=0.5)
+plt.plot(time, detrended_moving_avg, label="Moving Average Detrended", color='red')
+plt.title("Moving Average Detrended Signal")
+plt.legend()
+plt.show()
+
+
+#outlier removal 
+### 2. IQR Method 
+Q1, Q3 = np.percentile(detrended_moving_avg.dropna(), [25, 75])
+IQR = Q3 - Q1
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+detrended_no_outliers = detrended_moving_avg[(detrended_moving_avg >= lower_bound) & (detrended_moving_avg <= upper_bound)]
+detrended_no_outliers = detrended_no_outliers.interpolate(method='linear')
+valid_indices = detrended_no_outliers.index
+plt.figure(figsize=(10, 6))
+plt.plot(time, detrended_moving_avg, label="Before Outlier Removal", alpha=0.5, color='gray')
+plt.plot(time[valid_indices], detrended_no_outliers, label="After Outlier Removal (IQR)", color='red')
+plt.legend()
+plt.title("Outlier Removal using IQR")
+plt.show()
+
+
+#trebuie eliminate valorile duplicate
+detrended_no_outliers = detrended_no_outliers.drop_duplicates()
+
+#actualizez coloana cu ceea ce facut pana acum
+print("Index data:", data.index.dtype)
+print("Index detrended_no_outliers:", detrended_no_outliers.index.dtype)
+data.index = pd.to_datetime(data.index)
+detrended_no_outliers.index = pd.to_datetime(detrended_no_outliers.index)
+common_index = data.index.intersection(detrended_no_outliers.index)
+data.loc[common_index, 'wfv_2'] = detrended_no_outliers.loc[common_index]
+data['wfv_2'] = data['wfv_2'].interpolate(method='linear')
+print(data[['wfv_2']].head())
+data.to_csv(r'C:\Users\alema\Desktop\AN3\SBC\PROIECT\RainGarden_Curatat.csv', index=True)
+
+
+
+#modelarea
+sensor_col = 'wfv_2'
+data[sensor_col] = data[sensor_col].interpolate(method='linear')  # Ensure missing values are handled
+
+# Creating time-based features
+data['Hour'] = data.index.hour
+data['Day'] = data.index.day
+data['Month'] = data.index.month
+data['Year'] = data.index.year
+
+# Creating lag features (past values as predictors)
+for lag in range(1, 6):  # Creating lag features for last 5 time steps
+    data[f'{sensor_col}_lag{lag}'] = data[sensor_col].shift(lag)
+
+# Drop NaN values after shifting
+data.dropna(inplace=True)
+
+# Splitting data into features (X) and target variable (y)
+features = [col for col in data.columns if col != sensor_col]
+X = data[features]
+y = data[sensor_col]
+
+# Train-test split (80-20 split)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False, random_state=42)
+
+# Standardizing the features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Model 1: Linear Regression
+lr_model = LinearRegression()
+lr_model.fit(X_train_scaled, y_train)
+y_pred_lr = lr_model.predict(X_test_scaled)
+
+# Model 2: Random Forest Regressor
+rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+y_pred_rf = rf_model.predict(X_test)
+
+# Evaluating models
+def evaluate_model(y_true, y_pred, model_name):
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
+    return {'Model': model_name, 'RMSE': rmse, 'MAE': mae, 'R² Score': r2}
+
+# Storing results
+results = []
+results.append(evaluate_model(y_test, y_pred_lr, 'Linear Regression'))
+results.append(evaluate_model(y_test, y_pred_rf, 'Random Forest'))
+
+# Convert results to DataFrame and display
+results_df = pd.DataFrame(results)
+print(results_df)
+
+# Plot Predictions vs Actual Values
+plt.figure(figsize=(12, 6))
+plt.plot(y_test.index, y_test, label="Actual Values", color='blue', alpha=0.6)
+plt.plot(y_test.index, y_pred_lr, label="Linear Regression Predictions", color='green', linestyle='dashed', alpha=0.7)
+plt.plot(y_test.index, y_pred_rf, label="Random Forest Predictions", color='red', linestyle='dashed', alpha=0.7)
+plt.xlabel("Time")
+plt.ylabel("Soil Moisture Level (wfv_2)")
+plt.title("Sensor 2: Actual vs Predicted Values")
+plt.legend()
+plt.xticks(rotation=45)
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
